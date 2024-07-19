@@ -9,9 +9,12 @@ using namespace std;
 
 __global__ void stencil_1d(int *in, int *out)
 {
+	// Use shared memory to pass data from one thread to another
+	// In this case, each thread represents an element in the array, but we need
+	// sum across different thread
 	__shared__ int temp[BLOCK_SIZE + 2 * RADIUS];
-	int gindex = threadIdx.x + blockIdx.x * blockDim.x;
-	int lindex = threadIdx.x + RADIUS;
+	int gindex = threadIdx.x + blockIdx.x * blockDim.x; // global index
+	int lindex = threadIdx.x + RADIUS;					// local index
 
 	// Read input elements into shared memory
 	// No for loop here, just a thread
@@ -32,7 +35,7 @@ __global__ void stencil_1d(int *in, int *out)
 	// Apply the stencil
 	int result = 0;
 	for (int offset = -RADIUS; offset <= RADIUS; offset++)
-		result += temp[FIXME];
+		result += temp[offset + lindex];
 
 	// Store the result
 	out[gindex] = result;
@@ -49,7 +52,7 @@ int main(void)
 	int *d_in, *d_out; // device copies of a, b, c
 
 	// Alloc space for host copies and setup values
-	int size = (FIXME) * sizeof(int);
+	int size = (N + 2 * RADIUS) * sizeof(int);
 	in = (int *)malloc(size);
 	fill_ints(in, N + 2 * RADIUS);
 	out = (int *)malloc(size);
@@ -64,7 +67,7 @@ int main(void)
 	cudaMemcpy(d_out, out, size, cudaMemcpyHostToDevice);
 
 	// Launch stencil_1d() kernel on GPU
-	stencil_1d<<<N / BLOCK_SIZE, BLOCK_SIZE>>>(FIXME, FIXME);
+	stencil_1d<<<N / BLOCK_SIZE, BLOCK_SIZE>>>(d_in + RADIUS, d_out + RADIUS);
 
 	// Copy result back to host
 	cudaMemcpy(out, d_out, size, cudaMemcpyDeviceToHost);
